@@ -3,4 +3,4 @@ title: "Recent advances in (over)imputation with `mice`"
 format: html
 ---
 
-You can find [the presentation by Gerko Vink at ITACOSM 2023 here]()
+You can find [the presentation by Gerko Vink at ITACOSM 2023 here](vink_itascom.html)
