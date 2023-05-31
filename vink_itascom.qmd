@@ -1,0 +1,526 @@
+---
+title: "Recent advances in (over)imputation with `mice`"
+author: 
+  - name: Gerko Vink
+    orcid: 0000-0001-9767-1924
+    email: g.vink@uu.nl
+    affiliations:
+      - name: Methodology & Statistics @ Utrecht University
+date: June 7, 2023
+date-format: full
+execute: 
+  echo: true
+format: 
+  revealjs:
+    theme: [solarized, gerko.scss]
+    progress: true
+    margin: 0.075
+    logo: mice.png 
+    toc: false
+    toc-depth: 1
+    toc-title: Outline
+    slide-number: true
+    scrollable: false
+    width: 1200
+    reference-location: margin
+    footer: Gerko Vink @ ITACOSM 2023, University of Calabria, Italy
+---
+
+## Disclaimer
+
+I owe a debt of gratitude to many people as the thoughts and teachings in my slides are the process of years-long development cycles and discussions with my team, friends, colleagues and peers. When someone has contributed to the content of the slides, I have credited their authorship.
+
+Scientific references are in the footer. Opinions and figures are my own.
+<br><br>
+Packages used:
+```{r}
+library(mice)     # for imputation
+library(miceadds) # additional mice and pooling routines
+library(mitml)    # multiple imputation in multilevel modeling
+library(dplyr)    # for data wrangling
+library(lme4)     # linear mixed effects models
+library(purrr)    # functional programming
+library(magrittr) # pipes
+set.seed(123)
+```
+
+## At the start
+
+Let's start with the core:
+
+<center>
+**Statistical inference is the process of drawing conclusions about truths from data**
+</center>
+
+::::{.columns}
+:::{.column width="30%"}
+![](img/2.%20missingness_problem.png){width="90%"}
+:::
+
+::: {.column width="60%"}
+<br>
+
+Truths are boring, but they are convenient.
+
+-   however, for most problems truths require a lot of calculations, tallying or a complete census.
+-   therefore, a proxy of the truth is in most cases sufficient
+-   An example for such a proxy is a **sample**
+-   Samples are widely used and have been for a long time $^1$ 
+:::
+::::
+
+::: footer 
+$^1$ See [Jelke Bethlehem's CBS discussion paper](https://www.google.com/url?sa=t&rct=j&q=&esrc=s&source=web&cd=&ved=2ahUKEwjkyPTCs4L3AhUCuKQKHUpmBvIQFnoECAMQAw&url=https%3A%2F%2Fwww.cbs.nl%2F-%2Fmedia%2Fimported%2Fdocuments%2F2009%2F07%2F2009-15-x10-pub.pdf&usg=AOvVaw3BpUW2s_k0MB5yH1o-QGf2) for an overview of the history of survey sampling
+:::
+
+<!-- ## Being wrong about the truth --> 
+
+<!-- ::::{.columns} -->
+<!-- :::{.column width="30%"} -->
+<!-- ![](img/2.%20missingness_problem.png){width="90%"} -->
+<!-- ::: -->
+
+<!-- ::: {.column width="60%"} -->
+<!-- -   The population is the truth -->
+<!-- -   The sample comes from the population, but is generally smaller in size -->
+<!-- -   This means that not all cases from the population can be in our sample -->
+<!-- -   If not all information from the population is in the sample, then our sample may be *wrong* <br><br><br> Q1: Why is it important that our sample is not wrong?<br> Q2: How do we know that our sample is not wrong? -->
+<!-- ::: -->
+<!-- :::: -->
+
+## Let's jump forward
+::::{.columns}
+::: {.column width="30%"}
+![](img/10. missingness_simplified.png){width="60%"}
+:::
+
+::: {.column width="70%"}
+We now have two problems:
+
+-  we do not have the whole truth; but merely a sample of the truth
+-  we do not even have the whole sample, but merely a sample of the sample of the truth.
+
+If we would like to infer about the population, we would need to mimick the necessary variance mechanisms. 
+
+A straightforward and intuitive solution for analyzing incomplete data in such scenarios is *multiple imputation* (Rubin, 1987). 
+:::
+::::
+
+::: footer 
+Rubin, D. B. (1987). Multiple imputation for nonresponse in surveys. John Wiley & Sons.
+:::
+
+## Multiple imputation with `mice`
+:::: columns
+::: {.column width="60%"}
+![](img/imp.png){width="80%"}
+:::
+
+::: {.column width="40%"}
+There are two sources of uncertainty that we need to cover:
+
+1.  **Uncertainty about the missing value**:<br>when we don't know what the true observed value should be, we must create a distribution of values with proper variance (uncertainty).
+2.  **Uncertainty about the sampling**:<br>nothing can guarantee that our sample is the one true sample. So it is reasonable to assume that parameter estimation on our sample could be biased.
+
+**More challenging if the sample does not randomly come from the population or if the feature set is too limited to solve for the substantive model of interest**
+:::
+::::
+
+::: footer
+Van Buuren, S., & Groothuis-Oudshoorn, K. (2011). mice: Multivariate imputation by chained equations in R. Journal of statistical software, 45, 1-67. https://doi.org/10.5281/zenodo.7467995
+:::
+
+## Objective of this presentation 
+
+My aim is 
+
+- to outline some strategies for **imputing values "that could have been"**
+
+- to demonstrate that these strategies can also be used to identify procedures **"that could make sense"**. 
+
+In this presentation we will commit a cardinal sin: we overimpute the observed values. --> But it serves a purpose, so don't be alarmed yet. 
+
+### What is not the aim
+For reasons of brevity I will not go into the details about mainstream methods to generate multiple imputations. Specifically:
+
+1. We can either model the joint distribution of the data by means of **joint modeling** 
+2. Or, we can model each variable separately by means of **fully conditional specification**
+
+Just take it from me that merging the two techniques is a powerful procedure as we combine the **flexibility of FCS** with the **automatic compatibility and efficient parameterization of JM**
+
+<!-- ## Generating the imputations with FCS -->
+<!-- ```{r cache = TRUE} -->
+<!-- pred <- make.predictorMatrix(data) -->
+<!-- meth <- make.method(data) -->
+<!-- imp <- mice(data,  -->
+<!--             method = meth,  -->
+<!--             predictorMatrix = pred,  -->
+<!--             m = 10, print = FALSE) -->
+<!-- imp -->
+<!-- ``` -->
+<!-- # Hybrid Imputation -->
+
+## Hybrids of JM and FCS
+We can extend the defaults of `mice` and combine the flexibility of FCS with the appealing theoretical properties of JM
+
+In order to do so, we need to partition the variables into **blocks**
+
+- For example, we might partition $b$ blocks $h = 1,\dots,b$ as follows
+
+  - a single block with $b=1$ would hold a **joint model**:
+$$\{Y_1, Y_2, Y_3, Y_4\}, X$$
+  - a quadruppel block with $b=4$ would be the `mice` algorithm
+  $$\{Y_1\},\{Y_2\},\{Y_3\},\{Y_4\}, X$$
+
+  - anything in between would be a hybrid between the joint model and the `mice` model. For example,
+  $$\{Y_1, Y_2, Y_3\},\{Y_4\}, X$$  
+
+## Why the need for hybrid models?
+Just some examples where a hybrid imputation procedure would be useful:
+
+- **Imputing squares/nonlinear effects**: In the model $y=\alpha + \beta_1X+\beta_2X^2 + \epsilon$, $X$ and $X^2$ should be imputed jointly (Von Hippel, 2009, Seaman, Bartlett & White, 2012, Bartlett et al., 2015)
+- **Compositional data**: All the information about compositional data is encapsulated in the ratios between the components:
+
+$$
+\begin{array}{lllllllllllll}
+x_0 &=	&x_1		&+	&x_2		&+		&x_3		&+& x_4	& 		& 	& 	&\\
+       &  	&= 		&   	&      		& 		&  		&& =		& 		& 	&	&\\
+       &  	&x_9    	&   	&      		&		& 		&& x_5	& 		& 	&	&\\
+       &  	&+		&   	&      		&		& 		&& +		& 		& 	&	&\\
+       &  	&x_{10} 	&   	&      		&		& 	 	&&x_6		&= 		&x_7 	&+&x_8
+\end{array}
+$$
+
+- **Multivariate PMM**: Imputing a combination of outcomes optimally based on a linear combination of covariates (Cai, Van Buuren & Vink, 2022). 
+
+:::{.footer}
+Hippel, P. V. (2009). How to impute interactions, squares, and other transformed variables. Sociological Methodology, 39(1), 265-291.<br>
+Seaman, S. R., Bartlett, J. W., & White, I. R. (2012). Multiple imputation of missing covariates with non-linear effects and interactions: an evaluation of statistical methods. BMC medical research methodology, 12, 1-13.<br>
+Bartlett, J. W., Seaman, S. R., White, I. R., Carpenter, J. R., & Alzheimer's Disease Neuroimaging Initiative*. (2015). Multiple imputation of covariates by fully conditional specification: accommodating the substantive model. Statistical methods in medical research, 24(4), 462-487.<br>
+Cai, M., van Buuren, S., & Vink, G. (2022). Generalizing Univariate Predictive Mean Matching to Impute Multiple Variables Simultaneously. Intelligent Computing, Volume 1 (pp. 75-91). 
+:::
+
+## An example: `brandsma`
+The `brandsma` dataset (Snijders and Bosker, 2011) contains data from 4106 pupils in 216 schools. 
+```{r}
+data <- brandsma |> 
+  select(sch, lpo, iqv, den) |>
+  mutate(den = as.factor(den))
+head(data)
+```
+
+The scientific interest is to create a model for predicting the outcome `lpo` from the level-1 predictor `iqv` and the measured level-2 predictor `den` (which takes values 1-4). For pupil $i$ in school $c$ in composition notation:
+
+$$lpo_{ic} = \beta_0 + \beta_1\mathrm{iqv}_{ic} + \beta_2\mathrm{den}_c + \upsilon_{0c}+ \epsilon_{ic}$$
+where $\epsilon_{ic} \sim \mathcal{N}(0, \sigma_\epsilon^2)$ and $\upsilon_{0c} = \mathcal{N}(0, \sigma_\upsilon^2)$
+
+:::{.footer}
+Snijders, T. A. B., and R. J. Bosker. 2011. Multilevel Analysis. an Introduction to Basic and Advanced Multilevel Modeling. Second Edition. London: Sage Publications Ltd.
+:::
+
+## Conventional `mice`
+```{r}
+meth <- make.method(data)
+meth[c("lpo", "iqv", "den")] <- c("2l.pmm", "2l.pmm", "2lonly.pmm")
+meth
+pred <- make.predictorMatrix(data)
+pred["lpo", ] <- c(-2, 0, 3, 1) # -2 denotes cluster identifier
+pred["iqv", ] <- c(-2, 3, 0, 1) # 3 denotes including the covariate's cluster mean
+pred["den", ] <- c(-2, 1, 1, 0) # 1 denotes fixed effects predictor
+pred
+```
+```{r eval = TRUE, cache=TRUE}
+imp.fcs <- mice(data, 
+                predictorMatrix = pred, 
+                method = meth, 
+                m = 10, 
+                print = FALSE)
+```
+
+## With hybrid imputation in `blocks`
+We use the function `mitml::jomoImpute` and call it from within `mice`
+```{r cache = TRUE}
+block <- make.blocks(data, "collect") # assign all vars to a single block
+formula <- list(collect = list(lpo + iqv ~ 1 + (1 | sch),
+                               den ~ 1))
+
+```
+We parse the `block` and `formula` objects to their respective arguments in the `mice` function
+```{r eval = TRUE, cache=TRUE}
+imp.hybrid <- mice(data, 
+                   method = "jomoImpute", 
+                   blocks = block,
+                   formulas = formula, 
+                   print = FALSE, 
+                   m = 10, 
+                   n.burn = 100)
+```
+
+## Inferences from both strategies
+::::{.columns}
+::: {.column width="50%"}
+```{r}
+fit <- with(imp.fcs, 
+            lmer(lpo ~ 1 + (1 | sch), 
+                 REML = FALSE))
+testEstimates(as.mitml.result(fit), 
+              var.comp = TRUE)
+```
+:::
+::: {.column width="50%"}
+```{r }
+fit <- with(imp.hybrid, 
+            lmer(lpo ~ 1 + (1 | sch), 
+                 REML = FALSE))
+testEstimates(as.mitml.result(fit), 
+              var.comp = TRUE)
+```
+:::
+::::
+
+## Imputation vs data synthesis
+Instead of drawing only imputations from the posterior predictive distribution, we might as well overimpute the observed data. 
+<center>
+![](img/patterns.png){width="80%"} 
+</center>
+
+## How to draw any synthetic constellation with `mice`
+```{r echo = TRUE, cache = TRUE}
+complete <- na.omit(data) # complete cases
+newdata <- complete; newdata[!is.na(complete)] <- NA # empty set of the same size
+pred    <- make.predictorMatrix(complete) # predictor matrix
+mice(rbind(complete, newdata),
+                m = 5, 
+                method = "cart",
+                maxit = 1,
+                predictorMatrix = +lower.tri(pred), # use only the lower triangular
+                ignore = rep(c(FALSE, TRUE), each = nrow(complete)), # only use data
+                print = FALSE) |>
+  complete("all") |> # list of synthetic sets
+  map(~.x %$% lm(lpo ~ iqv)) |> # for every synthetic set do..
+  pool(rule = "reiter2003") |> # pool the analyses cf. Reiter (2003)
+  summary()
+
+# Complete case analysis
+lm(lpo ~ iqv, complete) |> summary() |> extract2("coefficients")
+```
+::: footer
+Reiter, J.P. (2003). Inference for Partially Synthetic, Public Use Microdata Sets. Survey Methodology, 29, 181-189.
+:::
+
+## What should synthetic data be?
+Nowadays many synthetic data cowboys claim that they can generate synthetic data that looks like the real data that served as input. 
+
+Many of these synthetic data packages only focus on marginal or conditional distributions. By generating multiple synthetic sets with `mice` we can also properly consider the inferential properties of the synthetic data. 
+
+In general, Volker & Vink (2021) argue that any synthetic data generation procedure should
+
+1. Preserve marginal distributions
+2. Preserve conditional distribution
+3. Yield valid inference
+4. Yield synthetic data that are indistinguishable from the real data
+
+::: footer
+Volker, T.B.; Vink, G. Anonymiced Shareable Data: Using mice to Create and Analyze Multiply Imputed Synthetic Datasets. Psych 2021, 3, 703-716. [https://doi.org/10.3390/psych3040045](https://doi.org/10.3390/psych3040045)
+:::
+
+## Synthesis a diagnostic tool
+Let's assume that we have an incomplete data set and that we can impute the incomplete values under multiple models
+
+**Challenge**<br>
+Imputing the data set under one model may yield different results than imputing the data set under another model. 
+
+**Problem**<br>
+We may have no idea about validity of either model's results: we would need either the true observed values or the estimand before we can judge the performance and validity of the imputation model.
+
+<div class="notepaper">
+  <figure class="quote">
+    <blockquote class="curly-quotes" cite="https://www.youtube.com/watch?v=qYLrc9hy0t0">
+    <font color="black">
+    We do have a constant in our problem, though: **the observed values**
+    </font>
+    </blockquote>
+  </figure>
+</div>
+
+## Posterior predictive checks
+
+<div style="float: left; width: 50%;">
+![](img/13. PPC_linear.png){width=80%}
+</div>
+
+<div style="float: right; width: 50%;">
+We can *overimpute* the observed values and evaluate how well the models fit on the observed values. 
+
+The assumption would then be that any good imputation model would properly cover the observed data (i.e. would fit to the observed data). 
+
+- If we overimpute the observations multiple times we can calculate bias, intervals and coverage. 
+- The model that would be unbiased, properly covered and have the smallest interval width would then be the most efficient model. 
+
+The model to the left clearly does not fit well to the observations.
+</div>
+
+<div style="clear: both;"></div>
+
+::: footer
+Cai, M., van Buuren, S., & Vink, G. (2022). Graphical and numerical diagnostic tools to assess multiple imputation models by posterior predictive checking. arXiv preprint arXiv:2208.12929.
+:::
+
+## Better fit
+
+<div style="float: left; width: 50%;">
+![](img/12. PPC_quadratic.png){width=80%}
+</div>
+
+<div style="float: right; width: 50%;">
+We can *overimpute* the observed values and evaluate how well the models fit on the observed values. 
+
+The assumption would then be that any good imputation model would properly cover the observed data (i.e. would fit to the observed data). 
+
+- If we overimpute the observations multiple times we can calculate bias, intervals and coverage. 
+- The model that would be unbiased, properly covered and have the smallest interval width would then be the most efficient model. 
+
+The model to the left fits quite well to the observations.
+
+<br> Can we infer truth?
+</div>
+
+<div style="clear: both;"></div>
+
+::: footer
+Cai, M., van Buuren, S., & Vink, G. (2022). Graphical and numerical diagnostic tools to assess multiple imputation models by posterior predictive checking. arXiv preprint arXiv:2208.12929.
+:::
+
+## Summary
+1. Hybrid imputation with blocks is a straightforward extension to the `mice` algorithm. 
+
+- Adding blocks allows for more flexibility in cases where multivariate imputation would lead to to better inference
+- Using blocks allows the modeler to remain closer to the observed data
+
+2. `mice` allows for the generation of synthetic data. 
+
+- Volker & Vink (2021) demonstrated that multiple synthetic sets generated with `mice`:
+  - yield valid inferences whilst preserving marginal and conditional distributions. 
+  - can not be distinguished from the true data
+
+- `mice` can both impute and synthesize simultaneously, although the pooling rules for such a scenario remain focus of future work
+
+3. Using `mice` to synthesizethe observed cases only effectively results in overimputation of observed data 
+
+- the imputations are draws from the posterior predictive distribution.
+- this allows for posterior predictive checks, diagnostic evaluations and comparisons between imputation models. 
+
+
+## Let's be open about it
+
+All materials can be found at <br><br>
+[www.gerkovink.com/overimputation](https://www.gerkovink.com/overimputation)
+<br><br><br>
+<center>
+Questions?
+</center>
+
+<!-- # If we end up in a discussion about JM and FCS -->
+
+<!-- ## How to go about generating imputations? -->
+<!-- Once we start the process of multiple imputation, we need a scheme to solve for multivariate missingness -->
+
+<!-- Some notation: -->
+
+<!-- - Let $Y$ be an incomplete column in the data -->
+
+<!--   - $Y_\mathrm{mis}$ denoting the unobserved part -->
+<!--   - $Y_\mathrm{obs}$ denotes the observed part -->
+
+<!-- - Let $X$ be a set of completely observed covariates -->
+
+<!-- In general, there are two flavours of multiple imputation:  -->
+
+<!-- 1. We can either model the joint distribution of the data by means of **joint modeling**  -->
+<!-- 2. Or, we can model each variable separately by means of **fully conditional specification** -->
+
+<!-- ## Joint modeling -->
+<!-- With JM, imputations are drawn from an assumed joint multivariate distribution.  -->
+
+<!-- - Often a multivariate normal model is used for both continuous and categorical data,  -->
+<!-- - Other joint models have been proposed (see e.g. Olkin and Tate, 1961; Van Buuren and van Rijckevorsel, 1992; Schafer, 1997; Van Ginkel et al., 2007; Goldstein et al., 2009; Chen et al., 2011).  -->
+
+<!-- Joint modeling imputations generated under the normal model are usually robust to misspecification of the imputation model (Schafer, 1997; Demirtas et al., 2008), **although transformation towards normality is generally beneficial.** -->
+
+<!-- ### Procedure -->
+<!-- 1. Specify the joint model $P(Y,X)$ -->
+<!-- 2. Derive $P(Y_\mathrm{mis}|Y_\mathrm{obs},X)$ -->
+<!-- 3. Draw imputations $\dot Y^\mathrm{mis}$ with a Gibbs sampler -->
+
+<!-- ## Joint modeling -->
+<!-- **PRO** -->
+
+<!-- - The conditionals are compatible -->
+<!-- - The statistical inference is correct under the assumed joint model -->
+<!-- - Efficient parametrization is possible -->
+<!-- - The theoretical properties are known -->
+
+<!-- **CON** -->
+
+<!-- - Having to specify a joint model impacts flexibility -->
+<!-- - The JM can assume more than the complete data problem -->
+<!-- - It can lead to unrealistically large models -->
+<!-- - The assumed model may not be very close to the data -->
+
+
+<!-- ## FCS -->
+<!-- Multiple imputation by means of FCS does not start from an explicit multivariate model.  -->
+
+<!-- <div class="notepaper"> -->
+<!--   <figure class="quote"> -->
+<!--     <blockquote class="curly-quotes" cite="https://www.youtube.com/watch?v=qYLrc9hy0t0"> -->
+<!--     <font color="black"> -->
+<!--    With FCS, multivariate missing data is imputed by univariately specifying an imputation model for each incomplete variable, conditional on a set of other (possibly incomplete) variables.  -->
+<!--     </font> -->
+<!--     </blockquote> -->
+<!--   </figure> -->
+<!-- </div> -->
+
+<!-- - the multivariate distribution for the data is thereby implicitly specified through the univariate conditional densities  -->
+<!-- - imputations are obtained by iterating over the conditionally specified imputation models. -->
+
+<!-- ### Procedure -->
+
+<!-- - Specify $P(Y^\mathrm{mis} | Y^\mathrm{obs}, X)$ -->
+<!-- - Draw imputations $\dot Y^\mathrm{mis}$ with Gibbs sampler -->
+
+<!-- ## FCS -->
+<!-- The general idea of using conditionally specified models to deal with missing data has been discussed and applied by many authors  -->
+
+<!--   - see e.g. Kennickell, 1991; Raghunathan and Siscovick, 1996; Oudshoorn et al., 1999; Brand, 1999; Van Buuren et al., 1999; Van Buuren and Oudshoorn, 2000; Raghunathan et al., 2001; Faris et al., 2002; Van Buuren et al., 2006.  -->
+
+<!-- Comparisons between JM and FCS have been made that indicate that FCS is a useful and flexible alternative to JM when the joint distribution of the data is not easily specified (Van Buuren, 2007) and that similar results may be expected from both imputation approaches (Lee and Carlin, 2010). -->
+
+<!-- ### FCS in `mice` -->
+
+<!-- - Specify the imputation models $P(Y_j^\mathrm{mis} | Y_j^\mathrm{obs}, Y_{-j}, X)$ -->
+
+<!--   - where $Y_{−j}$ is the set of incomplete variables except $Y_j$ -->
+
+<!-- - Fill in starting values for the missing data -->
+<!-- - And iterate -->
+
+<!-- ## Why I prefer FCS -->
+
+<!-- **PRO** -->
+
+<!-- - FCS is very flexible  -->
+<!-- - modeling remains close to the data -->
+<!-- - one may use a subset of predictors for each column -->
+<!-- - work very well in practice -->
+<!-- - straightforward to explain to applied researchers -->
+
+<!-- **CON** -->
+
+<!-- - its theoretical properties are only known in special cases -->
+<!-- - potential incompatibility of the collection of conditionals with the joint -->
+<!-- - no computational shortcuts -->
+
+<!-- Conclusion: -->
+
+<!-- $$\text{Merging JM and FCS would be better}$$ -->
