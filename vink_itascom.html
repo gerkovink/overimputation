@@ -640,12 +640,12 @@ den  -2   1   1   0</code></pre>
 <span id="cb11-2"><a href="#cb11-2"></a>            <span class="fu">lmer</span>(lpo <span class="sc">~</span> <span class="dv">1</span> <span class="sc">+</span> (<span class="dv">1</span> <span class="sc">|</span> sch), </span>
 <span id="cb11-3"><a href="#cb11-3"></a>                 <span class="at">REML =</span> <span class="cn">FALSE</span>))</span>
 <span id="cb11-4"><a href="#cb11-4"></a><span class="fu">testEstimates</span>(<span class="fu">as.mitml.result</span>(fit), </span>
-<span id="cb11-5"><a href="#cb11-5"></a>              <span class="at">var.comp =</span> <span class="cn">TRUE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb11-5"><a href="#cb11-5"></a>              <span class="at">extra.pars =</span> <span class="cn">TRUE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>
 Call:
 
-testEstimates(model = as.mitml.result(fit), var.comp = TRUE)
+testEstimates(model = as.mitml.result(fit), extra.pars = TRUE)
 
 Final parameter estimates and inferences obtained from 10 imputed data sets.
 
@@ -666,12 +666,12 @@ Unadjusted hypothesis test as appropriate in larger samples.</code></pre>
 <span id="cb13-2"><a href="#cb13-2"></a>            <span class="fu">lmer</span>(lpo <span class="sc">~</span> <span class="dv">1</span> <span class="sc">+</span> (<span class="dv">1</span> <span class="sc">|</span> sch), </span>
 <span id="cb13-3"><a href="#cb13-3"></a>                 <span class="at">REML =</span> <span class="cn">FALSE</span>))</span>
 <span id="cb13-4"><a href="#cb13-4"></a><span class="fu">testEstimates</span>(<span class="fu">as.mitml.result</span>(fit), </span>
-<span id="cb13-5"><a href="#cb13-5"></a>              <span class="at">var.comp =</span> <span class="cn">TRUE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb13-5"><a href="#cb13-5"></a>              <span class="at">extra.pars =</span> <span class="cn">TRUE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>
 Call:
 
-testEstimates(model = as.mitml.result(fit), var.comp = TRUE)
+testEstimates(model = as.mitml.result(fit), extra.pars = TRUE)
 
 Final parameter estimates and inferences obtained from 10 imputed data sets.
 
@@ -698,8 +698,8 @@ Instead of drawing only imputations from the posterior predictive distribution, 
 </section>
 <section id="how-to-draw-any-synthetic-constellation-with-mice" class="slide level2">
 <h2>How to draw any synthetic constellation with <code>mice</code></h2>
-<div class="cell" data-hash="vink_itascom_cache/revealjs/unnamed-chunk-9_a6307354b7324043fb443b485f5efe80">
-<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1"></a>complete <span class="ot">&lt;-</span> <span class="fu">na.omit</span>(data) <span class="co"># complete cases</span></span>
+<div class="cell" data-hash="vink_itascom_cache/revealjs/unnamed-chunk-9_ebb3fba3960b573dd440dc74bb1c5d62">
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1"></a>complete <span class="ot">&lt;-</span> <span class="fu">na.omit</span>(data[, <span class="fu">c</span>(<span class="dv">4</span><span class="sc">:</span><span class="dv">1</span>)]) <span class="co"># complete cases</span></span>
 <span id="cb15-2"><a href="#cb15-2"></a>newdata <span class="ot">&lt;-</span> complete; newdata[<span class="sc">!</span><span class="fu">is.na</span>(complete)] <span class="ot">&lt;-</span> <span class="cn">NA</span> <span class="co"># empty set of the same size</span></span>
 <span id="cb15-3"><a href="#cb15-3"></a>pred    <span class="ot">&lt;-</span> <span class="fu">make.predictorMatrix</span>(complete) <span class="co"># predictor matrix</span></span>
 <span id="cb15-4"><a href="#cb15-4"></a><span class="fu">mice</span>(<span class="fu">rbind</span>(complete, newdata),</span>
@@ -710,13 +710,14 @@ Instead of drawing only imputations from the posterior predictive distribution, 
 <span id="cb15-9"><a href="#cb15-9"></a>                <span class="at">ignore =</span> <span class="fu">rep</span>(<span class="fu">c</span>(<span class="cn">FALSE</span>, <span class="cn">TRUE</span>), <span class="at">each =</span> <span class="fu">nrow</span>(complete)), <span class="co"># only use data</span></span>
 <span id="cb15-10"><a href="#cb15-10"></a>                <span class="at">print =</span> <span class="cn">FALSE</span>) <span class="sc">|&gt;</span></span>
 <span id="cb15-11"><a href="#cb15-11"></a>  <span class="fu">complete</span>(<span class="st">"all"</span>) <span class="sc">|&gt;</span> <span class="co"># list of synthetic sets</span></span>
-<span id="cb15-12"><a href="#cb15-12"></a>  <span class="fu">map</span>(<span class="sc">~</span>.x <span class="sc">%$%</span> <span class="fu">lm</span>(lpo <span class="sc">~</span> iqv)) <span class="sc">|&gt;</span> <span class="co"># for every synthetic set do..</span></span>
-<span id="cb15-13"><a href="#cb15-13"></a>  <span class="fu">pool</span>(<span class="at">rule =</span> <span class="st">"reiter2003"</span>) <span class="sc">|&gt;</span> <span class="co"># pool the analyses cf. Reiter (2003)</span></span>
-<span id="cb15-14"><a href="#cb15-14"></a>  <span class="fu">summary</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb15-12"><a href="#cb15-12"></a>  <span class="fu">map</span>(<span class="sc">~</span>.x <span class="sc">|&gt;</span> <span class="fu">subset</span>(<span class="fu">rep</span>(<span class="fu">c</span>(F, T), <span class="fu">rep</span>(<span class="fu">nrow</span>(complete), <span class="dv">2</span>))) <span class="co"># take only the synthetic values</span></span>
+<span id="cb15-13"><a href="#cb15-13"></a>      <span class="sc">%$%</span> <span class="fu">lm</span>(lpo <span class="sc">~</span> iqv)) <span class="sc">|&gt;</span> <span class="co"># for every synthetic set do..</span></span>
+<span id="cb15-14"><a href="#cb15-14"></a>  <span class="fu">pool</span>(<span class="at">rule =</span> <span class="st">"reiter2003"</span>) <span class="sc">|&gt;</span> <span class="co"># pool the analyses cf. Reiter (2003)</span></span>
+<span id="cb15-15"><a href="#cb15-15"></a>  <span class="fu">summary</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>         term  estimate  std.error statistic       df       p.value
-1 (Intercept) 41.237327 0.08564407 481.49655 582.3861  0.000000e+00
-2         iqv  2.651185 0.04340935  61.07405 181.6810 4.855373e-123</code></pre>
+1 (Intercept) 41.282006 0.12119657 340.62026 449.0021  0.000000e+00
+2         iqv  2.591288 0.05925473  43.73133 321.6224 2.085102e-137</code></pre>
 </div>
 <div class="sourceCode cell-code" id="cb17"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1"></a><span class="co"># Complete case analysis</span></span>
 <span id="cb17-2"><a href="#cb17-2"></a><span class="fu">lm</span>(lpo <span class="sc">~</span> iqv, complete) <span class="sc">|&gt;</span> <span class="fu">summary</span>() <span class="sc">|&gt;</span> <span class="fu">extract2</span>(<span class="st">"coefficients"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>

@@ -264,7 +264,7 @@ fit <- with(imp.fcs,
             lmer(lpo ~ 1 + (1 | sch), 
                  REML = FALSE))
 testEstimates(as.mitml.result(fit), 
-              var.comp = TRUE)
+              extra.pars = TRUE)
 ```
 :::
 ::: {.column width="50%"}
@@ -273,7 +273,7 @@ fit <- with(imp.hybrid,
             lmer(lpo ~ 1 + (1 | sch), 
                  REML = FALSE))
 testEstimates(as.mitml.result(fit), 
-              var.comp = TRUE)
+              extra.pars = TRUE)
 ```
 :::
 ::::
@@ -286,7 +286,7 @@ Instead of drawing only imputations from the posterior predictive distribution, 
 
 ## How to draw any synthetic constellation with `mice`
 ```{r echo = TRUE, cache = TRUE}
-complete <- na.omit(data) # complete cases
+complete <- na.omit(data[, c(4:1)]) # complete cases
 newdata <- complete; newdata[!is.na(complete)] <- NA # empty set of the same size
 pred    <- make.predictorMatrix(complete) # predictor matrix
 mice(rbind(complete, newdata),
@@ -297,7 +297,8 @@ mice(rbind(complete, newdata),
                 ignore = rep(c(FALSE, TRUE), each = nrow(complete)), # only use data
                 print = FALSE) |>
   complete("all") |> # list of synthetic sets
-  map(~.x %$% lm(lpo ~ iqv)) |> # for every synthetic set do..
+  map(~.x |> subset(rep(c(F, T), rep(nrow(complete), 2))) # take only the synthetic values
+      %$% lm(lpo ~ iqv)) |> # for every synthetic set do..
   pool(rule = "reiter2003") |> # pool the analyses cf. Reiter (2003)
   summary()
 
