@@ -429,7 +429,7 @@ Cai, M., van Buuren, S., & Vink, G. (2022). Graphical and numerical diagnostic t
 - this allows for posterior predictive checks, diagnostic evaluations and comparisons between imputation models. 
 
 ::: footer
-$^1$ See also [this link](https://thomvolker.github.io/ParamSynthMice/mice_param_synth.html) to Thom Volker's domain for a more extensive set of simulations
+$^1$ See also [this link](https://thomvolker.github.io/ParamSynthMice/mice_param_synth.html) and [this link](https://thomvolker.github.io/ParamSynthMice/alternative_generation_scheme.html) to Thom Volker's domain for a more extensive set of simulations
 :::
 
 ## Let's be open about it
