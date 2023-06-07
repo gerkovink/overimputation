@@ -23,7 +23,7 @@ format:
     scrollable: false
     width: 1200
     reference-location: margin
-    footer: Gerko Vink & the `mice` developers @ ITACOSM 2023, University of Calabria, Italy
+    footer: Gerko Vink on behalf of the `mice` developers @ ITACOSM 2023, University of Calabria, Italy
 ---
 
 ## Disclaimer
@@ -343,6 +343,23 @@ We may have no idea about validity of either model's results: we would need eith
     </blockquote>
   </figure>
 </div>
+
+## Measures
+<center>
+![](img/PPCtable.png)
+</center>
+
+We see that we can identify the better fitting quadratic model based on the *Neyman-trifecta*:
+
+1. confidence validity
+2. lower average distance
+3. smaller confidence intervals
+
+In `mice` we can use the `where` argument to specify which cells we would like to be (over)imputed.
+
+::: footer
+Cai, M., van Buuren, S., & Vink, G. (2022). Graphical and numerical diagnostic tools to assess multiple imputation models by posterior predictive checking. arXiv preprint arXiv:2208.12929.
+:::
 
 ## Posterior predictive checks
 
